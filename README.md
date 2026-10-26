@@ -386,7 +386,7 @@ else:
 >
 > 完成首次手动测试后，内置 schedule 会每天运行。请勿再配置相同时间的外部 cron，否则会重复执行。
 >
-> 新版要求 API 调用显式传入 `dispatch_source`；旧版仅发送 `{"ref":"main"}` 的外部任务不会再执行签到，可直接在 cron-job.org 删除。
+> 当前 `dispatch_source` 为可选输入，省略时默认 `external`；建议外部任务显式填写，便于辨认来源。仅发送 `{"ref":"main"}` 也可触发当前工作流，不能用它阻止旧定时器；请在 cron-job.org 停用不再需要的任务。
 
 ---
 
@@ -473,7 +473,7 @@ else:
 | 错误                         | 现象         | 原因                   | 解决方法                                       |
 | ---------------------------- | ------------ | ---------------------- | ---------------------------------------------- |
 | **401 Unauthorized**         | 认证失败     | Authorization 格式错误 | 使用 `Bearer github_pat_xxx`                    |
-| **422 Unprocessable Entity** | 请求无法处理 | Body 缺少 ref 或必填 input | 按上面的完整 Request body 填写                 |
+| **422 Unprocessable Entity** | 请求无法处理 | ref 缺失/不存在或输入参数不合法 | 按上面的完整 Request body 填写                 |
 | **404 Not Found**            | 找不到工作流 | Actions 未启用或文件不存在 | 先完成 Fork、启用 Actions 并手动运行一次      |
 | Accept 被截断                | 配置错误     | 输入框显示不全         | 完整值：`application/vnd.github.v3+json`       |
 | Token 有空格                 | 认证失败     | Token 被意外截断       | Token 是连续字符串，中间不能有空格             |
@@ -635,12 +635,13 @@ GitHub 官方规则是：公开仓库连续 **60 天没有仓库活动**时，�
 
 **422 Unprocessable Entity（请求无法处理）**：
 
-```text
-❌ Body: {"ref": "main"}
-✅ Body: {"ref": "main", "inputs": {"dispatch_source": "external"}}
+外部定时器建议使用：
+
+```json
+{"ref":"main","inputs":{"dispatch_source":"external"}}
 ```
 
-本工作流要求同时指定分支名和 `dispatch_source`，用来阻止旧外部定时器继续重复签到。
+当前 `dispatch_source` 可省略，默认 `external`，因此 `{"ref":"main"}` 本身不是错误。遇到 422，请检查是否提供 `ref`、对应分支是否存在，以及 `inputs` 名称和取值是否与工作流一致。旧定时器需要在调度服务中停用，不能依赖省略此输入来阻止执行。
 
 **其他检查**：
 
@@ -693,7 +694,9 @@ cookie1&cookie2&cookie3
 2. 在 PushPlus 网站测试发送功能是否正常
 3. 查看 Actions 运行日志是否有错误
 
-PushPlus 完全可选，不影响签到。若 PushPlus 当前要求实名认证而你不想认证，可以删除 `PUSHPLUS_TOKEN`，或改用可选的 Telegram 推送；实名认证规则由 PushPlus 决定，本项目无法绕过。
+PushPlus 完全可选，不影响签到。[PushPlus 官方说明](https://www.pushplus.plus/doc/function/verify.html)要求发送消息的账号完成实名认证，未实名通常返回 `905`；认证费用以其当时页面为准，不是本项目收取的费用。
+
+不使用该服务时，可以不配置或删除 `PUSHPLUS_TOKEN`；签到仍会执行，也可以配置 `TELEGRAM_BOT_TOKEN` 和 `TELEGRAM_CHAT_ID` 使用 Telegram 推送。
 
 </details>
 
@@ -707,7 +710,9 @@ PushPlus 完全可选，不影响签到。若 PushPlus 当前要求实名认证�
 <details>
 <summary><b>Q: 积分、兑换天数和流量怎么算？</b></summary>
 
-本项目只读取 GLaDOS API 返回的积分、剩余天数和兑换选项，不制定会员或流量规则。服务条款可能变化，请以 GLaDOS 控制台当时显示的套餐与兑换页面为准；README 不对固定积分、流量或天数作长期承诺。
+签到积分、会员剩余天数和流量额度是不同的量。本项目从 GLaDOS API 读取积分、剩余天数与兑换选项；脚本不会为账号分配或重置流量，也不能用固定的“积分 → GB”比例计算流量。
+
+自动兑换使用本仓库预设的 `EXCHANGE_PLAN`（默认 `plan500`，按 500 分→100 天配置）向服务端提交兑换请求；实际可选档位、到账天数、套餐流量和重置规则，均以自己账号的 [GLaDOS 控制台](https://glados.cloud/console) 为准。若不希望自动兑换，设置仓库 Variable `EXCHANGE_PLAN=off`。不要把某次显示的“500 分→90 天”或其他档位当作长期不变的承诺。
 
 </details>
 
@@ -818,7 +823,7 @@ MIT
 
 **Made with ❤️ for GLaDOS users in 2026**
 
-**🔧 本项目最近一次维护验证：2026-09-30**
+**🔧 本项目最近一次维护验证：2026-10-25**
 
 **⭐ Star 一下，支持作者持续更新！⭐**
 
